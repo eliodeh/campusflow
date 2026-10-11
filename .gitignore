@@ -1,0 +1,12 @@
+# Virtual environment
+.venv/
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+
+# Environment variables (secrets, API keys)
+.env
+
+# Runtime data — tickets are user data, not source code
+data/tickets.json
