@@ -1,8 +1,7 @@
 """Engineering Understanding Check: scoring is separate from the menu loop."""
 from datetime import datetime
-from campusflow.cli_input import prompt_choice, prompt_text
-from campusflow.question_bank import QUESTIONS
-
+from cli_input import prompt_choice, prompt_text
+from question_bank import QUESTIONS
 LETTERS = ("A", "B", "C", "D")
 
 

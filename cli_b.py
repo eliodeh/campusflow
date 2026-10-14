@@ -3,11 +3,10 @@
 Error convention (agree with Engineer A): A's exceptions subclass ValueError,
 and add_note(tickets, ticket_id, author, message) raises on any rejection.
 """
-from campusflow.cli_input import prompt_choice, prompt_text
-from campusflow.reports import build_report, format_report
-from campusflow.search import (VALID_CATEGORIES, VALID_STATUSES, VALID_PRIORITIES,
-                               search_tickets, sort_by_priority_then_id)
-
+from cli_input import prompt_choice, prompt_text
+from report_insights import build_report, format_report
+from search import (VALID_CATEGORIES, VALID_STATUSES, VALID_PRIORITIES,
+                    search_tickets, sort_by_priority_then_id)
 
 def format_table(rows):
     if not rows:
