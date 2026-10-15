@@ -136,3 +136,62 @@ This log documents prompt-engineering interactions, human verification, and crit
 - **Verification & Critical Evaluation:** Non-integer inputs caused unhandled `ValueError` crashes, terminating the CLI session and dropping unpersisted memory state.
 - **Correction Applied (IMPROVED):** Wrapped user prompts in input validation layers and cleanly trapped domain `ValueError` exceptions, presenting clear messages and returning to the menu instead of crashing.
 - **Key Takeaway:** CLI applications for non-technical staff must handle invalid input gracefully without crashing.
+
+
+## Understanding Side Effects
+
+**Date:** 2026-10-14
+**Engineer:** Engineer A
+
+### Original concept gap
+I did not understand what a "side effect" meant in a function contract. I thought it was about code being "outside the function body." I could not explain why it mattered for teamwork.
+
+### Exact question asked
+"I don't know, explain the side effects for me."
+Then: "What is a side effect? Give one non-programming example."
+
+### Summary of AI guidance
+The AI explained that a side effect is any change a function makes to the world *besides* returning a value. It used a coffee shop analogy: a barista takes an order (return value), but also writes on a cup (side effect). It showed three levels: no side effect (validate), one intended side effect (add_note appends to list), and dangerous side effects (printing, saving, changing state unexpectedly).
+
+### Tiny unrelated experiment
+I imagined: "You ask a friend what time it is. They say '3 PM' and write it on your hand." The answer is "3 PM" (return value). Writing on your hand is the side effect. I checked: the answer stayed the same, but something else changed. That is a side effect.
+
+### Independent verification
+I connected it to the project: `add_note()` should have exactly ONE side effect — appending to `ticket["notes"]`. If it also printed or saved, that would break Engineer B's CLI. I confirmed this reasoning by tracing what would happen if B's CLI also printed "Note added." — the user would see two messages.
+
+### Final engineering decision
+I decided that all my validation functions will have ZERO side effects. They will only check and either return a value or raise an error. This makes them safe for B to call anywhere, any number of times.
+
+### Personal reflection
+Before: I thought side effects were just "things the function does." After: I understand they are promises to the caller, and extra ones break teamwork. What I tested: the whiteboard example. What I changed: my mental model of function contracts. Could I explain this without AI? Yes — a side effect is any change besides the return value.
+
+
+
+
+
+
+## Validate-Before-Mutate
+
+**Date:** 2026-10-14
+**Engineer:** Engineer A
+
+### Original concept gap
+I did not understand why the order of validation and mutation mattered. I thought if a function raises an error, the caller would just "undo" any partial changes.
+
+### Exact question asked
+"What is wrong with this code: `ticket['status'] = 'in_progress'` then `if not ticket['assigned_to']: raise`?"
+
+### Summary of AI guidance
+The AI explained that a function which mutates before validating can leave data corrupted. If the function changes `status` and then raises on the assignee check, the ticket is now in_progress but unassigned — an invalid state. The AI introduced the principle: "A function that can fail must change NOTHING on failure." The correct order is: validate everything first, then mutate only if all checks pass.
+
+### Tiny unrelated experiment
+I imagined a bank teller transferring $500. If the teller subtracts from Account A, then discovers Account B doesn't exist and raises an error, the money has vanished. A good teller checks everything first. I verified this by tracing the code line by line.
+
+### Independent verification
+I traced `transition_ticket(ticket, "in_progress")` on an unassigned ticket. With mutate-first: status changes, then error raises → ticket is corrupted. With validate-first: error raises before any change → ticket is untouched. I confirmed this matches the brief's requirement: "Invalid actions must leave the entire ticket collection unchanged."
+
+### Final engineering decision
+All my mutation functions will follow: (1) validate all preconditions, (2) mutate only after all checks pass, (3) if any check fails, raise without touching data. I will also write tests that snapshot the ticket before a rejected action and compare it after.
+
+### Personal reflection
+Before: I thought raising an error was enough to "cancel" an action. After: I understand that mutations are permanent unless prevented. What I tested: the bank teller scenario. What I changed: the structure of my functions. Could I explain this without AI? Yes — validate first, mutate last, or don't mutate at all.
