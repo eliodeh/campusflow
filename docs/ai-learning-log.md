@@ -136,3 +136,94 @@ This log documents prompt-engineering interactions, human verification, and crit
 - **Verification & Critical Evaluation:** Non-integer inputs caused unhandled `ValueError` crashes, terminating the CLI session and dropping unpersisted memory state.
 - **Correction Applied (IMPROVED):** Wrapped user prompts in input validation layers and cleanly trapped domain `ValueError` exceptions, presenting clear messages and returning to the menu instead of crashing.
 - **Key Takeaway:** CLI applications for non-technical staff must handle invalid input gracefully without crashing.
+
+
+## Understanding Side Effects
+
+**Date:** 2026-10-14
+**Engineer:** Engineer A
+
+### Original concept gap
+I did not understand what a "side effect" meant in a function contract. I thought it was about code being "outside the function body." I could not explain why it mattered for teamwork.
+
+### Exact question asked
+"I don't know, explain the side effects for me."
+Then: "What is a side effect? Give one non-programming example."
+
+### Summary of AI guidance
+The AI explained that a side effect is any change a function makes to the world *besides* returning a value. It used a coffee shop analogy: a barista takes an order (return value), but also writes on a cup (side effect). It showed three levels: no side effect (validate), one intended side effect (add_note appends to list), and dangerous side effects (printing, saving, changing state unexpectedly).
+
+### Tiny unrelated experiment
+I imagined: "You ask a friend what time it is. They say '3 PM' and write it on your hand." The answer is "3 PM" (return value). Writing on your hand is the side effect. I checked: the answer stayed the same, but something else changed. That is a side effect.
+
+### Independent verification
+I connected it to the project: `add_note()` should have exactly ONE side effect — appending to `ticket["notes"]`. If it also printed or saved, that would break Engineer B's CLI. I confirmed this reasoning by tracing what would happen if B's CLI also printed "Note added." — the user would see two messages.
+
+### Final engineering decision
+I decided that all my validation functions will have ZERO side effects. They will only check and either return a value or raise an error. This makes them safe for B to call anywhere, any number of times.
+
+### Personal reflection
+Before: I thought side effects were just "things the function does." After: I understand they are promises to the caller, and extra ones break teamwork. What I tested: the whiteboard example. What I changed: my mental model of function contracts. Could I explain this without AI? Yes — a side effect is any change besides the return value.
+
+
+
+
+
+
+## Validate-Before-Mutate
+
+**Date:** 2026-10-14
+**Engineer:** Engineer A
+
+### Original concept gap
+I did not understand why the order of validation and mutation mattered. I thought if a function raises an error, the caller would just "undo" any partial changes.
+
+### Exact question asked
+"What is wrong with this code: `ticket['status'] = 'in_progress'` then `if not ticket['assigned_to']: raise`?"
+
+### Summary of AI guidance
+The AI explained that a function which mutates before validating can leave data corrupted. If the function changes `status` and then raises on the assignee check, the ticket is now in_progress but unassigned — an invalid state. The AI introduced the principle: "A function that can fail must change NOTHING on failure." The correct order is: validate everything first, then mutate only if all checks pass.
+
+### Tiny unrelated experiment
+I imagined a bank teller transferring $500. If the teller subtracts from Account A, then discovers Account B doesn't exist and raises an error, the money has vanished. A good teller checks everything first. I verified this by tracing the code line by line.
+
+### Independent verification
+I traced `transition_ticket(ticket, "in_progress")` on an unassigned ticket. With mutate-first: status changes, then error raises → ticket is corrupted. With validate-first: error raises before any change → ticket is untouched. I confirmed this matches the brief's requirement: "Invalid actions must leave the entire ticket collection unchanged."
+
+### Final engineering decision
+All my mutation functions will follow: (1) validate all preconditions, (2) mutate only after all checks pass, (3) if any check fails, raise without touching data. I will also write tests that snapshot the ticket before a rejected action and compare it after.
+
+### Personal reflection
+Before: I thought raising an error was enough to "cancel" an action. After: I understand that mutations are permanent unless prevented. What I tested: the bank teller scenario. What I changed: the structure of my functions. Could I explain this without AI? Yes — validate first, mutate last, or don't mutate at all.
+---
+
+## CampusFlow Next Sprint — Engineer B Learning Cycles (Section 07)
+**Engineer B:** Gabriel Oche Adanu (@Aocheg)
+
+### Entry B4: Case-Insensitive Title Matching (`casefold()` vs `lower()`)
+- **Concept Gap:** Determining the most reliable approach for caseless substring search on ticket titles in Python.
+- **Exact Question Asked:** `"Compare casefold() and lower() for search; suggest test cases but do not implement my project."`
+- **Summary of AI Guidance:** The AI explained that `str.casefold()` is specifically designed for caseless matching per the Unicode standard, mapping aggressive case variations (such as German 'ß' to 'ss') whereas `lower()` only handles standard 1-to-1 ASCII/Unicode lowercase.
+- **Tiny Unrelated Experiment:**
+  ```python
+  text = "Fluß"
+  print(text.lower())     # 'fluß'
+  print(text.casefold())  # 'fluss'
+  assert "fluss" in text.casefold()
+  ```
+- **Independent Verification Through Tests/Docs:** Consulted Python 3.12 documentation for `str.casefold()`. Authored `test_08_search_title_ignores_case_matching_substring` in `tests/test_search.py` testing mixed-case and uppercase query matching.
+- **Final Engineering Decision:** Used `casefold()` on both the search query and the ticket title string in `search.py`.
+- **Personal Reflection:** Before this cycle, I assumed `.lower()` was sufficient for all text search. The test proved that `casefold()` is standard practice for robust caseless comparisons in Python.
+
+### Entry B5: Multi-Filter Logical Combination (AND vs OR) & Rejected Suggestion
+- **Concept Gap:** Designing the composition rules for multi-filter search (`category`, `status`, `priority`) and handling empty inputs.
+- **Exact Question Asked:** `"When combining category, status, and priority filters in a ticketing system search view, should filters be combined with OR or AND, and how should empty fields be treated?"`
+- **Summary of AI Guidance:** The AI proposed supporting a configurable filter mode defaulting to `OR` so that search returns more results by default.
+- **Tiny Unrelated Experiment:** Tested an `OR` vs `AND` sample on 3 tickets:
+  * Searching `title='wifi'`, `category='Network'`, `status='open'` with `OR` returned unrelated open tickets (e.g., Python IDE bug) and unrelated network tickets (e.g., resolved router).
+  * With `AND`, only tickets satisfying all criteria simultaneously matched.
+- **Critique & Rejection of AI Suggestion (Evidence Review):**
+  * **REJECTED the AI's proposal to use `OR`**: Requirement C of the project specification explicitly dictates: *"Filters must work together: if supplied, ALL must match. Empty filters mean 'do not filter by that field'."* Using `OR` violates the acceptance contract (Acceptance Criterion 09: *"Combined search filters use AND"*).
+- **Final Engineering Decision:** Enforced strict logical `AND` across all non-empty filters. Empty or `None` filters are skipped and do not exclude records.
+- **Personal Reflection:** AI suggestions often optimize for broad search retrieval instead of strict business contracts. Validating the AI's suggestion against the project specification prevented an acceptance test failure.
+

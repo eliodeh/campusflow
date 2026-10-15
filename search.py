@@ -1,10 +1,13 @@
-"""Read-only search and ordering helpers (Engineer B).
+"""search.py - Read-only ticket search with combined filtering (Requirement C).
 
-Contract: functions here NEVER mutate the tickets passed in. Search returns
-deep copies so display code cannot accidentally edit stored records.
+Owned by Engineer B (Milestones B1, B2). Pure function, no input()/print() --
+independently testable without typing anything. cli.py's menu collects the
+filter values and calls this; this never mutates the tickets list it's given.
 """
+
 import copy
 import re
+from typing import Any, Dict, List, Optional
 
 VALID_CATEGORIES = ("Network", "Hardware", "Software", "Other")
 VALID_STATUSES = ("open", "in_progress", "resolved")
@@ -18,33 +21,48 @@ def ticket_number(ticket_id):
     return int(match.group()) if match else float("inf")
 
 
-def _norm(text):
-    return str(text).strip().casefold()
+def search_tickets(
+    tickets_list: List[Dict[str, Any]],
+    title_query: str = "",
+    category: Optional[str] = None,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+) -> List[Dict[str, Any]]:
+    """Return tickets matching ALL supplied filters (logical AND).
+
+    - title_query: case-insensitive substring match using casefold().
+      Empty string means "don't filter by title".
+    - category / status / priority: exact match once supplied; None or ""
+      means "don't filter by that field".
+    - Invalid filter values raise ValueError.
+    - Read-only: never modifies any ticket. Returns deep copies.
 
 
-def search_tickets(tickets, query="", category="", status="", priority=""):
-    """Title substring (casefold) AND every supplied filter. Empty = skip."""
-    for value, allowed, label in (
-        (category, VALID_CATEGORIES, "category"),
-        (status, VALID_STATUSES, "status"),
-        (priority, VALID_PRIORITIES, "priority"),
-    ):
-        if value and _norm(value) not in {_norm(a) for a in allowed}:
-            raise ValueError(f"Invalid {label} filter: {value!r}")
+    """
+    if category and category not in VALID_CATEGORIES:
+        raise ValueError(f"Invalid category filter: {category!r}")
+    if status and status not in VALID_STATUSES:
+        raise ValueError(f"Invalid status filter: {status!r}")
+    if priority and priority not in VALID_PRIORITIES:
+        raise ValueError(f"Invalid priority filter: {priority!r}")
 
-    q, cat, st, pr = _norm(query), _norm(category), _norm(status), _norm(priority)
-    matches = []
-    for t in tickets:
-        if q and q not in _norm(t.get("title", "")):
+    results: List[Dict[str, Any]] = []
+    query = (title_query or "").strip().casefold()
+
+    for ticket in tickets_list:
+        if not isinstance(ticket, dict):
             continue
-        if cat and _norm(t.get("category", "")) != cat:
+        if query and query not in str(ticket.get("title", "")).casefold():
             continue
-        if st and _norm(t.get("status", "")) != st:
+        if category and ticket.get("category") != category:
             continue
-        if pr and _norm(t.get("priority", "")) != pr:
+        if status and ticket.get("status") != status:
             continue
-        matches.append(copy.deepcopy(t))
-    return matches
+        if priority and ticket.get("priority") != priority:
+            continue
+        results.append(copy.deepcopy(ticket))
+
+    return results
 
 
 def sort_by_priority_then_id(tickets):
