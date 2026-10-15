@@ -130,3 +130,182 @@ I wrote contracts for `validate_affected_users`, `add_note`, `get_notes` and `tr
 1. I Re-answered  Q4 to Q8 from memory without help.
 2. Write `validate_affected_users` with the bool check first.
 3. Write tests for `True`, `False`, `0`, `-3` and `5`.
+
+
+
+
+
+# Design Decisions — CampusFlow Next
+
+**Engineer:** Engineer A (Ticket Safety & Storage)
+**Date:** 2026-10-15
+
+This document records the key engineering decisions behind CampusFlow Next's data layer. Each decision explains *why* the approach was chosen, not just *what* it does.
+
+---
+
+## ADR-001: Exceptions over return values for validation
+
+**Date:** 2026-10-15
+**Status:** Accepted
+
+### Context
+Engineer B's CLI calls Engineer A's validation and mutation functions. We need a consistent way to signal failure. Two options: return a special value (like `None` or a tuple), or raise an exception.
+
+### Decision
+Use typed exceptions: `ValidationError`, `NoteError`, `StorageError`, `TransitionError`. All validation and mutation functions raise these on failure.
+
+### Consequences
+- B's CLI wraps every call in `try/except`.
+- Business logic stays clean — no need to check for `None` after every call.
+- Exception types are meaningful and can be caught specifically.
+
+### Alternatives considered
+**Result tuples** (`(ok, error)`) were rejected because callers can forget to check them. Exceptions cannot be ignored silently.
+
+---
+
+## ADR-002: Validate-before-mutate
+
+**Date:** 2026-10-15
+**Status:** Accepted
+
+### Context
+If a function validates *after* mutating, a failed validation leaves data in a corrupted state. The brief requires: *"Invalid actions must leave the entire ticket collection unchanged."*
+
+### Decision
+Every mutation function follows this order:
+1. Validate all preconditions.
+2. If all pass, mutate.
+3. If any fail, raise without touching data.
+
+### Consequences
+- Rejected actions leave the collection byte-for-byte identical.
+- Tests can snapshot state before an action and compare it after a rejection.
+- The invariant is: **a function that can fail must change nothing on failure.**
+
+### Alternatives considered
+Mutating then rolling back on failure was rejected — rollback is harder to get right and leaves room for partial corruption.
+
+---
+
+## ADR-003: Bool check before int check
+
+**Date:** 2026-10-15
+**Status:** Accepted
+
+### Context
+In Python, `bool` is a subtype of `int`. So `isinstance(True, int)` returns `True`. If `affected_users` is validated with only `isinstance(value, int)`, then `True` passes and is stored as a number.
+
+### Decision
+In `validate_affected_users`, check `isinstance(value, bool)` **first**, raise if true, then check `isinstance(value, int)`.
+
+### Consequences
+- `True` and `False` are rejected with a clear error.
+- `1` and `0` are still accepted as integers (but `0` is rejected by the `> 0` check).
+- The saved JSON never contains a boolean in the `affected_users` field.
+
+### Alternatives considered
+Relying on the `value <= 0` check was rejected — `True <= 0` is `False`, so a boolean would sneak through.
+
+---
+
+## ADR-004: Atomic load — return a new list, never mutate the caller's
+
+**Date:** 2026-10-15
+**Status:** Accepted
+
+### Context
+`load_tickets(path)` reads a JSON file. If record #7 is invalid, records #1–6 must not end up in memory. The brief says: *"If any record is invalid, clearly reject the load and keep current memory unchanged."*
+
+### Decision
+`load_tickets(path)` returns a **new list**. It never mutates a list passed in by the caller. The caller assigns the result atomically:
+```python
+new_tickets = load_tickets(path)  # raises on failure → old tickets untouched
+tickets = new_tickets             # atomic swap
+Consequences
+A failed load leaves the caller's memory completely unchanged.
+
+The function is a "pure read" — it changes nothing in the caller's world.
+
+Tests can verify this by calling load_tickets() with a corrupt file and asserting the caller's list is unchanged.
+
+Alternatives considered
+Passing the caller's list in and appending to it was rejected — a mid-load failure would leave partial data.
+
+ADR-005: Next ID = max + 1, not len + 1
+Date: 2026-10-15
+Status: Accepted
+
+Context
+Ticket IDs may have gaps (e.g., T001, T003, T005). If next ID is computed as len(tickets) + 1, it will eventually collide with an existing ID.
+
+Decision
+next_ticket_id(tickets) extracts the numeric part of every ticket ID, takes the maximum, adds 1, and formats back to T + zero-padded number. Same rule for next_note_id(ticket) per ticket.
+
+Consequences
+The next ID is always higher than every existing ID.
+
+Gaps are preserved, not filled.
+
+No collision after reload.
+
+Alternatives considered
+len + 1 was rejected — it fails when IDs have gaps, and it recomputes the same value until a ticket is actually added, causing collisions.
+
+ADR-006: Note IDs are per-ticket, computed from existing notes
+Date: 2026-10-15
+Status: Accepted
+
+Context
+Each note has an ID like N001, N002. The brief says: "A rejected note must not consume a note ID." We need an ID scheme that is safe against rejections.
+
+Decision
+Note IDs are computed from the existing notes in that ticket — take the maximum existing numeric note ID and add 1. Never use a mutable counter that increments before validation.
+
+Consequences
+A rejected note (e.g., on a resolved ticket) does not consume an ID.
+
+Calling next_note_id() twice in a row returns the same value — it is idempotent.
+
+Reopening a resolved ticket and adding a note continues from the last note ID.
+
+Alternatives considered
+A stored counter (ticket["next_note_id"]) was rejected — if it increments before validation, rejected notes consume IDs.
+
+ADR-007: Validation functions are read-only
+Date: 2026-10-15
+Status: Accepted
+
+Context
+Validation functions are called frequently — from the CLI, from tests, from other functions. If they mutate anything, they become unsafe.
+
+Decision
+All functions in validation.py have zero side effects. They check, return a value, or raise. They never print, never mutate, never save.
+
+Consequences
+B can call any validation function as many times as needed without worrying.
+
+Validation is a pure read operation.
+
+The contract says: "SIDE EFFECTS: none."
+
+Alternatives considered
+Mixing validation and normalization (returning a modified copy) was considered acceptable — but the function still does not mutate the input. It returns a new value.
+
+Summary of Invariants
+These are the promises the data layer makes:
+
+Validate-before-mutate: A function that can fail changes nothing on failure.
+
+No partial state: The ticket collection is either fully updated or unchanged.
+
+Atomic load: A failed JSON load leaves memory untouched.
+
+ID continuity: Next IDs are computed from max + 1, never len + 1.
+
+No ID consumption on rejection: Rejected notes do not consume note IDs.
+
+Read-only validation: Validators never mutate.
+
+Reject bool as int: True and False are rejected where integers are expected.
