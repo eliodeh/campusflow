@@ -90,3 +90,43 @@ To reflect the team's two-repository setup:
 2. `fork`: Forked repository managed by Engineer B — Eli Odeh (`https://github.com/eliodeh/CampusFlow.git`).
 3. Branches follow the required specification: `<type>/<issue-number>-<short-description>`.
 4. Pull Requests require cross-engineer reviews with substantive technical comments prior to merging into `main`.
+
+
+
+
+# AI Learning Log: Engineer A (Ticket Safety & Storage)
+
+## Cycle 1: Side effects and function contracts
+**What I asked:** I said I didn't know what a side effect was and asked the AI to explain it.
+**What confused me:** I first described a side effect as "anything a function does outside its body." The AI corrected me: a side effect is any change that happens besides the answer the function returns.
+**What I understand now:** Printing, saving a file, and changing a dictionary are side effects. If a function's contract doesn't mention them, it must not do them. For example, if `add_note` printed "Note saved!" and B's CLI also printed "Note added.", the user would see two messages and B would lose control of the output.
+
+## Cycle 2: Validate-before-mutate
+**What I asked:** I was given a `transition_ticket` example that changed the status before checking `assigned_to`.
+**What I understand now:** A function that can fail must change nothing on failure. All checks come first, and the change happens last.
+**Still shaky:** I can say the rule, but I had trouble explaining why it applies to every function.
+
+## Cycle 3: The boolean trap
+**What I asked:** I was asked what happens when `validate_affected_users(True)` is called.
+**What I understand now:** In Python, `bool` is a subtype of `int`, so `isinstance(True, int)` is `True` and `True` passes a naive check. The bool check must come before the int check. If `True` is stored, the system doesn't crash. It silently produces wrong data.
+**What I got wrong first:** I put the bool check "after" the int check and gave answers that didn't match the question. It took several retries.
+
+## Cycle 4: Atomic load, max + 1, and note IDs
+**What I was taught:** `load_tickets` builds a new list and returns it only if every record passes, so a failed load leaves current memory unchanged. Next IDs come from the highest existing ID + 1, not the count + 1. `add_note` validates before generating an ID, so a failed call consumes no ID.
+**Honest status:** I got Q4 to Q8 wrong on my first attempt and was shown the correct answers. I have not yet shown that I can produce them on my own.
+
+## Cycle 5: Writing contracts
+I wrote contracts for `validate_affected_users`, `add_note`, `get_notes` and `transition_ticket`. I made mistakes on most of them because I copied the previous contract instead of reading the function name and parentheses. The final versions are in `docs/design-decisions.md`.
+
+## Not completed
+- Baseline check (`baseline-check.md`)
+- Code for validation, notes, transitions, and JSON load/save
+- Tests
+- Peer review and pull requests
+
+**Reason:** I started with limited time and was still learning the underlying concepts (side effects, validate-before-mutate, atomic load). I plan to continue with the code in the next session.
+
+## What I would do next
+1. I Re-answered  Q4 to Q8 from memory without help.
+2. Write `validate_affected_users` with the bool check first.
+3. Write tests for `True`, `False`, `0`, `-3` and `5`.
