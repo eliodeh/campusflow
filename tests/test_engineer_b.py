@@ -1,10 +1,9 @@
 import copy, os, tempfile, unittest
-from campusflow.search import search_tickets, sort_by_priority_then_id, ticket_number
-from campusflow.reports import build_report, format_report
-from campusflow.question_bank import QUESTIONS
-from campusflow.understanding_check import score_answers, run_check
-from campusflow import cli_b
-
+from search import search_tickets, sort_by_priority_then_id, ticket_number
+from report_insights import build_report, format_report
+from question_bank import QUESTIONS
+from understanding_check import score_answers, run_check
+import cli_b
 
 def T(i, title, cat="Network", status="open", pr="medium", notes=None):
     return {"id": i, "title": title, "category": cat, "urgency": "low", "affected_users": 1,

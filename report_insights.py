@@ -1,6 +1,5 @@
 """Report calculation (pure) and formatting (pure). No input(), no print()."""
-from campusflow.search import VALID_CATEGORIES, VALID_STATUSES, VALID_PRIORITIES
-
+from search import VALID_CATEGORIES, VALID_STATUSES, VALID_PRIORITIES
 
 def _count(tickets, field, known):
     counts = {k: 0 for k in known}
