@@ -36,6 +36,8 @@ def search_tickets(
       means "don't filter by that field".
     - Invalid filter values raise ValueError.
     - Read-only: never modifies any ticket. Returns deep copies.
+
+
     """
     if category and category not in VALID_CATEGORIES:
         raise ValueError(f"Invalid category filter: {category!r}")
