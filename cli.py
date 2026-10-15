@@ -183,7 +183,8 @@ def main_loop(storage_path: str = storage.DEFAULT_STORAGE_PATH) -> None:
 
     while True:
         display_menu()
-        choice = input("Select an option (1-9): ").strip()
+        choice = input("Select an option (1-13): ").strip()
+        print(f"DEBUG: choice={choice!r}, tickets loaded={len(all_tickets)}")
         if choice == "1":
             handle_create_ticket(all_tickets, storage_path)
         elif choice == "2":
@@ -201,12 +202,20 @@ def main_loop(storage_path: str = storage.DEFAULT_STORAGE_PATH) -> None:
         elif choice == "8":
             handle_reports(all_tickets)
         elif choice == "9":
+            handle_add_note(all_tickets, storage_path)
+        elif choice == "10":
+            handle_view_notes(all_tickets)
+        elif choice == "11":
+            handle_search_tickets(all_tickets)
+        elif choice == "12":
+            understanding_check.run_understanding_check()
+        elif choice == "13":
             storage.save_tickets(all_tickets, storage_path)
             print("\nAll data successfully persisted. Goodbye!")
             break
         else:
-            print("Invalid choice. Please enter a number between 1 and 9.")
-
+            print("Invalid choice. Please enter a number between 1 and 13.")
+        input("\nPress Enter to return to the menu...")
 
 if __name__ == "__main__":
     main_loop()
