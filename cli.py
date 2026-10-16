@@ -296,7 +296,6 @@ def main_loop(storage_path: str = storage.DEFAULT_STORAGE_PATH) -> None:
     while True:
         display_menu()
         choice = input("Select an option (1-13): ").strip()
-        print(f"DEBUG: choice={choice!r}, tickets loaded={len(all_tickets)}")
         if choice == "1":
             handle_create_ticket(all_tickets, storage_path)
         elif choice == "2":
