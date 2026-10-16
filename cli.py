@@ -326,6 +326,7 @@ def main_loop(storage_path: str = storage.DEFAULT_STORAGE_PATH) -> None:
             break
         else:
             print("Invalid choice. Please enter a number between 1 and 13.")
+        input("\nPress Enter to return to the menu...")
 
 
 if __name__ == "__main__":
